@@ -1,7 +1,8 @@
 // Login.js
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import axios from '../services/axios';
+import { AuthContext } from '../utils/AuthContext';
 import '../styles/App.css';
 
 function Login() {
@@ -9,12 +10,17 @@ function Login() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const navigate = useNavigate();
+  const { login } = useContext(AuthContext);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
       const response = await axios.post('/token/', { username, password });
-      localStorage.setItem('authToken', response.data.access);
+      const token = response.data.access;
+
+      // Call the login function from AuthContext
+      login(token);
+
       localStorage.setItem('refreshToken', response.data.refresh);
       navigate('/dashboard'); // Redirect to the dashboard
     } catch (err) {

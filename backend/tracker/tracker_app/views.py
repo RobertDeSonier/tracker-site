@@ -9,6 +9,8 @@ import json
 from rest_framework_simplejwt.authentication import JWTAuthentication
 import logging
 from .auth_backend import MongoJWTAuthentication
+from django.views.decorators.http import require_http_methods
+from bson import ObjectId
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -55,7 +57,7 @@ def create_record(request):
             timestamp = datetime.strptime(data['timestamp'], '%Y-%m-%dT%H:%M:%S')
             item = Item.objects.get(name=data['item'])
             comment = data.get('comment', '')
-            record = Record(item=item, action=data['action'], timestamp=timestamp, comment=comment)
+            record = Record(item=item, timestamp=timestamp, comment=comment)
             record.save()
             return JsonResponse({'message': 'Record created successfully'})
         except KeyError as e:
@@ -234,7 +236,7 @@ def list_records(request):
             records = Record.objects(item=item)
             return JsonResponse({
                 'records': [
-                    {'id': str(record.id), 'action': record.action, 'timestamp': record.timestamp, 'comment': record.comment}
+                    {'id': str(record.id), 'timestamp': record.timestamp, 'comment': record.comment}
                     for record in records
                 ]
             })
@@ -248,14 +250,11 @@ def update_record(request):
         try:
             data = json.loads(request.body)  # Parse JSON data
             record_id = data['record_id']
-            action = data.get('action')
             timestamp = data.get('timestamp')
             comment = data.get('comment')
 
             record = Record.objects(id=record_id).first()
             if record:
-                if action:
-                    record.action = action
                 if timestamp:
                     record.timestamp = datetime.strptime(timestamp, '%Y-%m-%dT%H:%M:%S')
                 if comment is not None:
@@ -287,3 +286,95 @@ def delete_record(request):
             return JsonResponse({'error': f'Missing field: {str(e)}'}, status=400)
         except json.JSONDecodeError:
             return JsonResponse({'error': 'Invalid JSON data'}, status=400)
+
+# View to list and create tracking items
+@csrf_exempt
+@require_http_methods(["GET", "POST"])
+def manage_items(request):
+    try:
+        jwt_authenticator = MongoJWTAuthentication()
+        user, _ = jwt_authenticator.authenticate(request)
+        if not user:
+            return JsonResponse({'error': 'User not authenticated'}, status=401)
+
+        if request.method == 'GET':
+            items = Item.objects(owner=user)
+            items_list = [{'id': str(item.id), 'name': item.name, 'description': item.description} for item in items]
+            return JsonResponse({'items': items_list})
+
+        elif request.method == 'POST':
+            data = json.loads(request.body)
+            name = data.get('name')
+            description = data.get('description', '')
+
+            if not name:
+                return JsonResponse({'error': 'Name is required'}, status=400)
+
+            item = Item(name=name, description=description, owner=user)
+            item.save()
+            return JsonResponse({'message': 'Item created successfully', 'id': str(item.id)})
+
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+# View to update or delete a tracking item
+@csrf_exempt
+@require_http_methods(["PUT", "DELETE"])
+def manage_item(request, item_id):
+    try:
+        jwt_authenticator = MongoJWTAuthentication()
+        user, _ = jwt_authenticator.authenticate(request)
+        if not user:
+            return JsonResponse({'error': 'User not authenticated'}, status=401)
+
+        item = Item.objects(id=ObjectId(item_id), owner=user).first()
+        if not item:
+            return JsonResponse({'error': 'Item not found'}, status=404)
+
+        if request.method == 'PUT':
+            data = json.loads(request.body)
+            item.name = data.get('name', item.name)
+            item.description = data.get('description', item.description)
+            item.save()
+            return JsonResponse({'message': 'Item updated successfully'})
+
+        elif request.method == 'DELETE':
+            item.delete()
+            return JsonResponse({'message': 'Item deleted successfully'})
+
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+# View to handle records for a specific item
+@csrf_exempt
+@require_http_methods(["GET", "POST"])
+def manage_records(request, item_id):
+    try:
+        jwt_authenticator = MongoJWTAuthentication()
+        user, _ = jwt_authenticator.authenticate(request)
+        if not user:
+            return JsonResponse({'error': 'User not authenticated'}, status=401)
+
+        item = Item.objects(id=ObjectId(item_id), owner=user).first()
+        if not item:
+            return JsonResponse({'error': 'Item not found'}, status=404)
+
+        if request.method == 'GET':
+            records = Record.objects(item=item)
+            records_list = [
+                {'id': str(record.id), 'datetime': record.timestamp, 'comment': record.comment}
+                for record in records
+            ]
+            return JsonResponse({'records': records_list})
+
+        elif request.method == 'POST':
+            data = json.loads(request.body)
+            timestamp = datetime.strptime(data['datetime'], '%Y-%m-%dT%H:%M:%S')
+            comment = data.get('comment', '')
+
+            record = Record(item=item, timestamp=timestamp, comment=comment)
+            record.save()
+            return JsonResponse({'message': 'Record added successfully', 'id': str(record.id)})
+
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)

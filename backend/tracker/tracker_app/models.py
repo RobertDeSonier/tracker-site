@@ -25,6 +25,5 @@ class Item(Document):
 # Define the Record model
 class Record(Document):
     item = ReferenceField(Item)
-    action = StringField(required=True)
     timestamp = DateTimeField()
     comment = StringField()

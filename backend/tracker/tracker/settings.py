@@ -76,21 +76,15 @@ TEMPLATES = [
 WSGI_APPLICATION = 'tracker.wsgi.application'
 
 
-# Database
-# https://docs.djangoproject.com/en/5.2/ref/settings/#databases
-
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.dummy',  # Placeholder since mongoengine doesn't use Django's ORM
-    }
-}
-
-# Connect to MongoDB
+# Connect to MongoDB using mongoengine
 connect(
-    db="tracker_site",
+    db="tracker_site",  # Replace with your MongoDB database name
     host="localhost",
     port=27017
 )
+
+# Remove DATABASES setting as it is no longer needed
+DATABASES = {}
 
 
 # Password validation

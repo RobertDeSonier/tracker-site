@@ -1,5 +1,6 @@
 from django.urls import path
 from . import views
+from .views import manage_items, manage_item, manage_records
 
 urlpatterns = [
     path('create_user/', views.create_user, name='create_user'),
@@ -16,4 +17,7 @@ urlpatterns = [
     path('list_records/', views.list_records, name='list_records'),
     path('update_record/', views.update_record, name='update_record'),
     path('delete_record/', views.delete_record, name='delete_record'),
+    path('items/', manage_items, name='manage_items'),
+    path('items/<str:item_id>/', manage_item, name='manage_item'),
+    path('items/<str:item_id>/records/', manage_records, name='manage_records'),
 ]
